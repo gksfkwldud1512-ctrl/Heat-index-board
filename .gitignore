@@ -1,0 +1,5 @@
+.vercel
+node_modules
+collector/.env
+collector/collector.log
+보완 키/

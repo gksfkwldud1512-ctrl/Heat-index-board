@@ -1,0 +1,11 @@
+{
+  "name": "heat-index-collector",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node poll.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}
