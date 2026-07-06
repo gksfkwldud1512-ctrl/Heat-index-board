@@ -1,0 +1,12 @@
+{
+  "name": "heat-index-beacon",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node control.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "tp-link-tapo-connect": "^2.0.0"
+  }
+}

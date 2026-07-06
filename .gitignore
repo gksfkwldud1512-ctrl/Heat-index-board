@@ -2,4 +2,5 @@
 node_modules
 collector/.env
 collector/collector.log
+beacon/.env
 보완 키/
