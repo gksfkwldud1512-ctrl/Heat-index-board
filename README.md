@@ -13,10 +13,12 @@
 **배포 주소: https://board-seven-rho.vercel.app** (Vercel, 아무 컴퓨터 브라우저에서 접속 가능)
 
 ## 판정 규칙
-- 고정 판정 시각 6개: **03:00, 07:00, 09:00, 15:00, 17:00, 23:00**
+- 고정 판정 시각 9개: **01:00, 03:00, 07:00, 09:00, 11:00, 15:00, 17:00, 19:00, 23:00**
 - 판정 시각 T의 측정창: **[T-60분, T-30분)** (10분 간격 3회 데이터)
 - 측정창의 6개 공정 전체 평균 체감온도가 **33도 이상**이면 T~T+10분 "쉬는시간 부여"
 - 화면은 각 측정창이 끝나는 시점(T-30분)부터 다음 측정창이 끝날 때까지 그 판정 결과를 계속 표시
+- 화면 상단에 오늘 9개 판정 시각의 현황을 각각 박스로 표시 (부여/미부여/미측정)
+- 시계 옆 **측정기준** 버튼으로 전체 로직 설명, **엑셀 다운로드** 버튼으로 누적 판정 기록 내보내기 가능
 
 ## 전체 구조
 ```
@@ -41,7 +43,7 @@ collector/
   config.js       # Air365/Supabase 계정 정보 + 센서 serialNo→공정명 매핑
   .env.example    # 로컬에서 poll.js 수동 테스트할 때 참고용 (GitHub Actions는 Secrets 사용)
 database/
-  schema.sql      # Supabase에서 실행할 테이블 정의
+  schema.sql      # Supabase에서 실행할 테이블 정의 (readings: 원시 측정값, decisions: 판정 시각별 확정 기록)
 .github/workflows/
   collect.yml     # 10분마다 collector/poll.js 실행하는 GitHub Actions 워크플로우
 beacon/
@@ -72,6 +74,26 @@ npx vercel --prod
 1. https://supabase.com → GitHub 계정으로 가입 → New Project
 2. Settings → API에서 `Project URL`, `anon public key`, `service_role key` 확보
 3. SQL Editor에 `database/schema.sql` 내용 실행
+
+**이미 `readings` 테이블을 만들어둔 프로젝트라면** (엑셀 다운로드 기능 추가로 `decisions` 테이블이 새로 생김), 아래 부분만 SQL Editor에서 추가로 실행하면 됩니다:
+```sql
+create table decisions (
+  id bigserial primary key,
+  log_date date not null,
+  judgment_hour int not null,
+  avg_temp numeric(4,1) not null,
+  granted boolean not null,
+  created_at timestamptz not null default now(),
+  unique (log_date, judgment_hour)
+);
+
+create index idx_decisions_date on decisions(log_date desc, judgment_hour);
+
+alter table decisions enable row level security;
+create policy "public_read_decisions" on decisions for select using (true);
+create policy "public_upsert_decisions" on decisions for insert with check (true);
+create policy "public_update_decisions" on decisions for update using (true);
+```
 
 ### 2) 업체(케이웨더)에서 연동 정보 받기
 - `api_key`와 Air365 그룹 계정명(id) 발급받기 (IP 제한은 업체 쪽에서 해제해주기로 함)

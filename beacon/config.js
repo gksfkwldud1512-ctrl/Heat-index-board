@@ -13,7 +13,7 @@ export const CONFIG = {
   TAPO_IP: process.env.TAPO_IP || 'YOUR_SMART_PLUG_LOCAL_IP', // 예: 192.168.0.50
 
   // 판정 로직 (board/js/board.js와 동일하게 유지)
-  FIXED_TIMES: [3, 7, 9, 15, 17, 23],
+  FIXED_TIMES: [1, 3, 7, 9, 11, 15, 17, 19, 23],
   THRESHOLD: 33,
 
   CHECK_INTERVAL_MS: 15000, // 15초마다 판정 재확인

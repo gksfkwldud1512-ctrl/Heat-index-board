@@ -1,7 +1,7 @@
 // =============================================
 // 설정값 - 나중에 실제 값으로 교체
 // =============================================
-const FIXED_TIMES = [3, 7, 9, 15, 17, 23]; // 판정 시각 (시)
+const FIXED_TIMES = [1, 3, 7, 9, 11, 15, 17, 19, 23]; // 판정 시각 (시)
 const THRESHOLD = 33;                       // 쉬는시간 부여 기준 (평균 체감온도)
 const PROCESS_NAMES = [
   '1P 성형-소결',
@@ -74,38 +74,46 @@ function getActiveT(nowMinutes) {
 
 // -------------------------------------------
 // 데이터 연결 지점
-// 우선순위: 테스트 패널 값 > Supabase 실데이터 > 임시(mock)값
-// (windowStart, windowEnd는 { h, m } 형태, 판정에 쓸 30분 측정창 / parts는 오늘 날짜 기준 Seoul 시각)
 // -------------------------------------------
-async function fetchWindowData(windowStart, windowEnd, parts) {
+
+// 판정 시각 T의 측정창(T-1시 00분~30분) 원시 데이터 조회 (parts는 조회할 날짜, Seoul 기준)
+async function queryWindowReadings(parts, T) {
+  if (!supabaseClient) return null;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000); // 응답 지연 시 5초 후 포기
+  try {
+    const startISO = seoulHMToUTCISO(parts, T - 1, 0);
+    const endISO = seoulHMToUTCISO(parts, T - 1, 30);
+
+    const { data, error } = await supabaseClient
+      .from('readings')
+      .select('process_name, sense_temp')
+      .gte('recorded_at', startISO)
+      .lt('recorded_at', endISO)
+      .abortSignal(controller.signal);
+
+    if (error) throw error;
+    if (data && data.length) {
+      return data.map(r => ({ name: r.process_name, value: r.sense_temp }));
+    }
+    return null;
+  } catch (e) {
+    console.error(`Supabase 조회 실패 (T=${T}시):`, e.message);
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// 우선순위: 테스트 패널 값 > Supabase 실데이터 > 임시(mock)값
+async function fetchWindowData(parts, T) {
   if (testState.enabled) {
     return buildMockReadings(testState.avg);
   }
 
-  if (supabaseClient) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 응답 지연 시 5초 후 mock으로 전환
-    try {
-      const startISO = seoulHMToUTCISO(parts, windowStart.h, windowStart.m);
-      const endISO = seoulHMToUTCISO(parts, windowEnd.h, windowEnd.m);
-
-      const { data, error } = await supabaseClient
-        .from('readings')
-        .select('process_name, sense_temp')
-        .gte('recorded_at', startISO)
-        .lt('recorded_at', endISO)
-        .abortSignal(controller.signal);
-
-      if (error) throw error;
-      if (data && data.length) {
-        return data.map(r => ({ name: r.process_name, value: r.sense_temp }));
-      }
-    } catch (e) {
-      console.error('Supabase 조회 실패, 임시값으로 대체:', e.message);
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
+  const readings = await queryWindowReadings(parts, T);
+  if (readings) return readings;
 
   return buildMockReadings(28 + Math.random() * 3);
 }
@@ -120,6 +128,92 @@ function buildMockReadings(avg) {
 function computeDecision(readings) {
   const avg = readings.reduce((sum, r) => sum + r.value, 0) / readings.length;
   return { avg: +avg.toFixed(1), granted: avg >= THRESHOLD };
+}
+
+// -------------------------------------------
+// 오늘 하루 9개 판정 시각의 현황 (상단 스트립 + 엑셀용 기록)
+// -------------------------------------------
+const dailyCache = { dateKey: null, results: {} };
+
+function dateKeyOf(parts) {
+  return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}`;
+}
+
+async function upsertDecision(parts, T, avg, granted) {
+  if (!supabaseClient) return;
+  try {
+    const { error } = await supabaseClient.from('decisions').upsert(
+      { log_date: dateKeyOf(parts), judgment_hour: T, avg_temp: avg, granted },
+      { onConflict: 'log_date,judgment_hour' }
+    );
+    if (error) throw error;
+  } catch (e) {
+    console.error(`decisions 기록 실패 (T=${T}시):`, e.message);
+  }
+}
+
+async function computeDailyStatus(parts, nowMinutes) {
+  const key = dateKeyOf(parts);
+  if (dailyCache.dateKey !== key) {
+    dailyCache.dateKey = key;
+    dailyCache.results = {};
+  }
+
+  const sortedTimes = [...FIXED_TIMES].sort((a, b) => a - b);
+  const statuses = [];
+
+  for (const T of sortedTimes) {
+    const revealMinutes = T * 60 - 30;
+
+    if (nowMinutes < revealMinutes) {
+      statuses.push({ T, status: 'pending' });
+      continue;
+    }
+
+    if (dailyCache.results[T]) {
+      statuses.push({ T, status: dailyCache.results[T].granted ? 'granted' : 'not-granted' });
+      continue;
+    }
+
+    // 테스트 모드: 실 데이터를 건드리지 않고 미리보기만 (DB에 기록하지 않음)
+    if (testState.enabled) {
+      statuses.push({ T, status: testState.avg >= THRESHOLD ? 'granted' : 'not-granted' });
+      continue;
+    }
+
+    const readings = await queryWindowReadings(parts, T);
+    if (!readings) {
+      statuses.push({ T, status: 'no-data' });
+      continue;
+    }
+
+    const avg = +(readings.reduce((sum, r) => sum + r.value, 0) / readings.length).toFixed(1);
+    const granted = avg >= THRESHOLD;
+    dailyCache.results[T] = { avg, granted };
+    statuses.push({ T, status: granted ? 'granted' : 'not-granted' });
+
+    await upsertDecision(parts, T, avg, granted);
+  }
+
+  return statuses;
+}
+
+function renderDailyStatus(statuses) {
+  const strip = document.getElementById('daily-status-strip');
+  const labelOf = {
+    granted: '부여',
+    'not-granted': '미부여',
+    pending: '미측정',
+    'no-data': '데이터없음',
+  };
+
+  strip.innerHTML = '';
+  statuses.forEach(({ T, status }) => {
+    const box = document.createElement('div');
+    box.className = 'status-box' + (status === 'granted' || status === 'not-granted' ? ` ${status}` : '');
+    box.innerHTML = `<div class="hour">${pad2(T)}시</div><div class="label">${labelOf[status]}</div>`;
+    strip.appendChild(box);
+  });
 }
 
 // -------------------------------------------
@@ -139,6 +233,8 @@ function render(state) {
     state.decision.granted ? '쉬는시간 부여' : '쉬는시간 없음';
 
   document.getElementById('avg-temp').textContent = `${state.decision.avg}°C`;
+
+  renderDailyStatus(state.dailyStatus);
 
   const grid = document.getElementById('process-grid');
   grid.innerHTML = '';
@@ -213,6 +309,47 @@ function setupCriteriaModal() {
 }
 
 // -------------------------------------------
+// 엑셀 다운로드 (지금까지 쌓인 판정 기록 전체)
+// -------------------------------------------
+async function exportToExcel() {
+  if (!supabaseClient) {
+    alert('Supabase가 연결되어 있지 않습니다.');
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from('decisions')
+    .select('log_date, judgment_hour, avg_temp, granted')
+    .order('log_date', { ascending: true })
+    .order('judgment_hour', { ascending: true });
+
+  if (error) {
+    alert('기록을 불러오지 못했습니다: ' + error.message);
+    return;
+  }
+  if (!data || !data.length) {
+    alert('아직 내보낼 기록이 없습니다.');
+    return;
+  }
+
+  const rows = data.map(r => ({
+    '날짜': r.log_date,
+    '판정시각': `${pad2(r.judgment_hour)}:00`,
+    '평균 체감온도(℃)': r.avg_temp,
+    '결과': r.granted ? '쉬는시간 부여' : '쉬는시간 없음',
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '쉬는시간 기록');
+  XLSX.writeFile(wb, `쉬는시간_기록_${dateKeyOf(getSeoulParts())}.xlsx`);
+}
+
+function setupExcelButton() {
+  document.getElementById('excel-btn').addEventListener('click', exportToExcel);
+}
+
+// -------------------------------------------
 // 테스트 패널 상태 (하드웨어 연결 전 화면 확인용 - 배포 시 board/index.html의
 // test-panel 섹션과 이 블록을 함께 제거하면 됩니다)
 // -------------------------------------------
@@ -254,11 +391,12 @@ async function tick() {
   const breakStart = { h: T, m: 0 };
   const breakEnd = { h: T, m: 10 };
 
-  const readings = await fetchWindowData(windowStart, windowEnd, parts);
+  const readings = await fetchWindowData(parts, T);
   const decision = computeDecision(readings);
+  const dailyStatus = await computeDailyStatus(parts, nowMinutes);
 
   render({
-    parts, T, readings, decision,
+    parts, T, readings, decision, dailyStatus,
     windowLabel: `${fmtHM(windowStart.h, windowStart.m)} ~ ${fmtHM(windowEnd.h, windowEnd.m)}`,
     breakLabel: `${fmtHM(breakStart.h, breakStart.m)} ~ ${fmtHM(breakEnd.h, breakEnd.m)}`,
   });
@@ -267,6 +405,7 @@ async function tick() {
 function start() {
   setupTestPanel();
   setupCriteriaModal();
+  setupExcelButton();
   tick();
   setInterval(tick, TICK_MS);
   setInterval(updateClockOnly, CLOCK_MS);
