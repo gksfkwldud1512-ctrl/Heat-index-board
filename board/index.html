@@ -14,11 +14,50 @@
       <img src="assets/logo.png" alt="Johnson Electric" class="logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
       <div class="logo-fallback">JOHNSON ELECTRIC</div>
     </div>
-    <div class="time-area">
-      <div class="date" id="date">----년 --월 --일 (-)</div>
-      <div class="clock" id="clock">--:--:--</div>
+    <div class="header-right">
+      <button class="criteria-btn" id="criteria-btn">측정기준</button>
+      <div class="time-area">
+        <div class="date" id="date">----년 --월 --일 (-)</div>
+        <div class="clock" id="clock">--:--:--</div>
+      </div>
     </div>
   </header>
+
+  <div class="modal-overlay" id="criteria-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">측정기준 안내</div>
+        <button class="modal-close" id="criteria-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <div class="modal-section-title">판정 시각</div>
+          <div class="modal-section-text">하루 중 정해진 6번의 시각에 쉬는시간 부여 여부를 판정합니다: <b>03:00, 07:00, 09:00, 15:00, 17:00, 23:00</b></div>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-title">측정시간(측정창)</div>
+          <div class="modal-section-text">각 판정 시각(T) 기준 <b>T-60분 ~ T-30분</b> 사이 30분 동안, 10분 간격으로 3회 측정한 6개 공정 전체의 평균 체감온도를 사용합니다. (예: 09:00 판정 → 08:00~08:30 데이터 사용)</div>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-title">판정 기준</div>
+          <div class="modal-section-text">측정시간 동안의 평균 체감온도가 <b>33℃ 이상</b>이면 판정 시각부터 10분간(T ~ T+10분) "쉬는시간 부여"를 표시합니다. 33℃ 미만이면 "쉬는시간 없음"을 표시합니다.</div>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-title">결과 산정이 바뀌는 시점</div>
+          <div class="modal-section-text">화면은 각 측정시간이 끝나는 시점(T-30분)에 판정을 새로 계산해서, 다음 측정시간이 끝날 때까지 그 결과를 계속 표시합니다.</div>
+          <table class="modal-table">
+            <tr><th>화면 표시 구간</th><th>적용되는 판정</th></tr>
+            <tr><td>02:30 ~ 06:30</td><td>03:00 판정</td></tr>
+            <tr><td>06:30 ~ 08:30</td><td>07:00 판정</td></tr>
+            <tr><td>08:30 ~ 14:30</td><td>09:00 판정</td></tr>
+            <tr><td>14:30 ~ 16:30</td><td>15:00 판정</td></tr>
+            <tr><td>16:30 ~ 22:30</td><td>17:00 판정</td></tr>
+            <tr><td>22:30 ~ 익일 02:30</td><td>23:00 판정</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <main class="screen state-idle" id="screen">
     <div class="banner" id="banner">
@@ -37,11 +76,6 @@
       </div>
 
       <div class="process-grid" id="process-grid"></div>
-    </div>
-
-    <div class="window-time-big">
-      <div class="window-time-label">측정시간</div>
-      <div class="window-time-value" id="window-range">--:-- ~ --:--</div>
     </div>
   </main>
 

@@ -139,7 +139,6 @@ function render(state) {
     state.decision.granted ? '쉬는시간 부여' : '쉬는시간 없음';
 
   document.getElementById('avg-temp').textContent = `${state.decision.avg}°C`;
-  document.getElementById('window-range').textContent = state.windowLabel;
 
   const grid = document.getElementById('process-grid');
   grid.innerHTML = '';
@@ -199,6 +198,21 @@ function updateClockOnly() {
 }
 
 // -------------------------------------------
+// 측정기준 안내 패널
+// -------------------------------------------
+function setupCriteriaModal() {
+  const overlay = document.getElementById('criteria-overlay');
+  const openBtn = document.getElementById('criteria-btn');
+  const closeBtn = document.getElementById('criteria-close');
+
+  openBtn.addEventListener('click', () => overlay.classList.add('open'));
+  closeBtn.addEventListener('click', () => overlay.classList.remove('open'));
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+}
+
+// -------------------------------------------
 // 테스트 패널 상태 (하드웨어 연결 전 화면 확인용 - 배포 시 board/index.html의
 // test-panel 섹션과 이 블록을 함께 제거하면 됩니다)
 // -------------------------------------------
@@ -252,6 +266,7 @@ async function tick() {
 
 function start() {
   setupTestPanel();
+  setupCriteriaModal();
   tick();
   setInterval(tick, TICK_MS);
   setInterval(updateClockOnly, CLOCK_MS);
