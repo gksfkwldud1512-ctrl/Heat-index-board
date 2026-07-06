@@ -139,7 +139,7 @@ function render(state) {
     state.decision.granted ? '쉬는시간 부여' : '쉬는시간 없음';
 
   document.getElementById('avg-temp').textContent = `${state.decision.avg}°C`;
-  document.getElementById('window-range').textContent = `측정창: ${state.windowLabel}`;
+  document.getElementById('window-range').textContent = state.windowLabel;
 
   const grid = document.getElementById('process-grid');
   grid.innerHTML = '';
@@ -148,6 +148,45 @@ function render(state) {
     cell.className = 'process-cell' + (r.value >= THRESHOLD ? ' over' : '');
     cell.innerHTML = `<div class="name">${r.name}</div><div class="value">${r.value}°C</div>`;
     grid.appendChild(cell);
+  });
+
+  drawConnectors();
+}
+
+// 평균온도 카드에서 각 공정 셀로 이어지는 연결선을 그림 (공정별 값이 평균에 반영됨을 시각적으로 표시)
+function drawConnectors() {
+  const wrap = document.getElementById('diagram-wrap');
+  const svg = document.getElementById('connector-svg');
+  const avgCard = document.getElementById('info-card');
+  const cells = document.querySelectorAll('#process-grid .process-cell');
+  if (!wrap || !svg || !avgCard || !cells.length) return;
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const wrapRect = wrap.getBoundingClientRect();
+  const avgRect = avgCard.getBoundingClientRect();
+  const fromX = avgRect.left + avgRect.width / 2 - wrapRect.left;
+  const fromY = avgRect.bottom - wrapRect.top;
+
+  svg.innerHTML = '';
+  cells.forEach(cell => {
+    const r = cell.getBoundingClientRect();
+    const toX = r.left + r.width / 2 - wrapRect.left;
+    const toY = r.top - wrapRect.top;
+    const midY = fromY + (toY - fromY) / 2;
+
+    const path = document.createElementNS(svgNS, 'path');
+    path.setAttribute('d', `M ${fromX} ${fromY} C ${fromX} ${midY}, ${toX} ${midY}, ${toX} ${toY}`);
+    path.setAttribute('stroke', '#a7b2c9');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('fill', 'none');
+    svg.appendChild(path);
+
+    const dot = document.createElementNS(svgNS, 'circle');
+    dot.setAttribute('cx', toX);
+    dot.setAttribute('cy', toY);
+    dot.setAttribute('r', 3.5);
+    dot.setAttribute('fill', '#a7b2c9');
+    svg.appendChild(dot);
   });
 }
 
@@ -216,6 +255,7 @@ function start() {
   tick();
   setInterval(tick, TICK_MS);
   setInterval(updateClockOnly, CLOCK_MS);
+  window.addEventListener('resize', drawConnectors);
 }
 
 start();

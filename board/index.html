@@ -26,15 +26,23 @@
       <div class="banner-text" id="banner-text">판정 대기중</div>
     </div>
 
-    <div class="info-row">
-      <div class="info-card">
-        <div class="info-label">측정시점 평균온도</div>
-        <div class="info-value" id="avg-temp">--°C</div>
-        <div class="info-sub" id="window-range">측정창: --:-- ~ --:--</div>
+    <div class="diagram-wrap" id="diagram-wrap">
+      <svg id="connector-svg"></svg>
+
+      <div class="info-row">
+        <div class="info-card" id="info-card">
+          <div class="info-label">측정시점 평균온도</div>
+          <div class="info-value" id="avg-temp">--°C</div>
+        </div>
       </div>
+
+      <div class="process-grid" id="process-grid"></div>
     </div>
 
-    <div class="process-grid" id="process-grid"></div>
+    <div class="window-time-big">
+      <div class="window-time-label">측정시간</div>
+      <div class="window-time-value" id="window-range">--:-- ~ --:--</div>
+    </div>
   </main>
 
   <!-- 개발/테스트용 컨트롤 패널 - 실제 배포 시 이 섹션만 삭제하면 됩니다 -->

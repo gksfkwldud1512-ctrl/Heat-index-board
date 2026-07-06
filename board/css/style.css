@@ -105,11 +105,27 @@ html, body {
   50% { box-shadow: 0 0 40px 12px rgba(23, 181, 99, 0.25); }
 }
 
+.diagram-wrap {
+  position: relative;
+  width: 100%;
+}
+
+#connector-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
 .info-row {
   display: flex;
   justify-content: center;
   width: 100%;
   margin-bottom: 3vh;
+  position: relative;
 }
 
 .info-card {
@@ -120,6 +136,7 @@ html, body {
   text-align: center;
   min-width: 40vw;
   box-shadow: 0 2px 6px rgba(26, 34, 51, 0.08);
+  position: relative;
 }
 
 .info-label {
@@ -134,17 +151,32 @@ html, body {
   color: #1a2233;
 }
 
-.info-sub {
-  font-size: 1.8vh;
-  color: #8592ab;
-  margin-top: 0.5vh;
-}
-
 .process-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 1.2vw;
   width: 100%;
+  position: relative;
+}
+
+.window-time-big {
+  width: 100%;
+  text-align: center;
+  margin-top: auto;
+  padding-top: 1.5vh;
+}
+
+.window-time-label {
+  font-size: 2.2vh;
+  color: #62708c;
+  margin-bottom: 0.3vh;
+}
+
+.window-time-value {
+  font-size: 6.5vh;
+  font-weight: 800;
+  color: #1a2233;
+  font-variant-numeric: tabular-nums;
 }
 
 .process-cell {
