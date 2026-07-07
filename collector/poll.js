@@ -3,11 +3,11 @@ import { CONFIG, SERIAL_TO_PROCESS } from './config.js';
 
 const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_SERVICE_KEY);
 
-// Air365 "최신값" 조회 - 그룹에 등록된 센서 전체를 한 번에 반환
-// (규격서: KW_Air365 IoT데이터 API 규격서_v1.6.pdf, 2.2 상세기능 내역)
+// Air365 "최신값" 조회 - 계정에 등록된 센서 전체를 한 번에 반환
+// 실측 응답 기준 필드명 사용 (규격서 문서의 snake_case 예시와 다름: iaqList/senseTemp가 실제 값)
 async function fetchLatest() {
-  const url = `${CONFIG.AIR365_API_URL}?stationType=ALL&idType=GROUP` +
-    `&id=${encodeURIComponent(CONFIG.AIR365_GROUP_ID)}&api_key=${CONFIG.AIR365_API_KEY}`;
+  const url = `${CONFIG.AIR365_API_URL}?stationType=ALL&idType=${CONFIG.AIR365_ID_TYPE}` +
+    `&id=${encodeURIComponent(CONFIG.AIR365_ID)}&api_key=${CONFIG.AIR365_API_KEY}`;
 
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Air365 API 오류: ${res.status}`);
@@ -15,16 +15,16 @@ async function fetchLatest() {
   const data = await res.json();
   if (String(data.error) !== '0') throw new Error(`Air365 응답 오류: ${data.message}`);
 
-  return data.result?.iaq_list ?? [];
+  return data.result?.iaqList ?? [];
 }
 
-// serialNo -> 공정명 매핑되는 것만, sense_temp(체감온도) 있는 것만 사용
+// serialNo -> 공정명 매핑되는 것만, senseTemp(체감온도) 있는 것만 사용
 function toRows(iaqList) {
   return iaqList
-    .filter(d => SERIAL_TO_PROCESS[d.serialNo] && d.sense_temp != null)
+    .filter(d => SERIAL_TO_PROCESS[d.serialNo] && d.senseTemp != null)
     .map(d => ({
       process_name: SERIAL_TO_PROCESS[d.serialNo],
-      sense_temp: d.sense_temp,
+      sense_temp: d.senseTemp,
     }));
 }
 
