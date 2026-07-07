@@ -4,3 +4,6 @@ collector/.env
 collector/collector.log
 beacon/.env
 보완 키/
+.claude/
+*.png
+!board/assets/*.png
