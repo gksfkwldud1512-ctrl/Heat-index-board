@@ -106,12 +106,8 @@ async function queryWindowReadings(parts, T) {
   }
 }
 
-// 우선순위: 테스트 패널 값 > Supabase 실데이터 > 임시(mock)값
+// 우선순위: Supabase 실데이터 > 임시(mock)값
 async function fetchWindowData(parts, T) {
-  if (testState.enabled) {
-    return buildMockReadings(testState.avg);
-  }
-
   const readings = await queryWindowReadings(parts, T);
   if (readings) return readings;
 
@@ -120,10 +116,6 @@ async function fetchWindowData(parts, T) {
 
 // 화면에 보여줄 "현재" 값 - 가장 최근에 수집된 공정별 체감온도 (판정용 측정창과 별개, 실시간 표시 전용)
 async function fetchLatestReadings() {
-  if (testState.enabled) {
-    return buildMockReadings(testState.avg);
-  }
-
   if (supabaseClient) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -208,12 +200,6 @@ async function computeDailyStatus(parts, nowMinutes) {
 
     if (dailyCache.results[T]) {
       statuses.push({ T, status: dailyCache.results[T].granted ? 'granted' : 'not-granted' });
-      continue;
-    }
-
-    // 테스트 모드: 실 데이터를 건드리지 않고 미리보기만 (DB에 기록하지 않음)
-    if (testState.enabled) {
-      statuses.push({ T, status: testState.avg >= THRESHOLD ? 'granted' : 'not-granted' });
       continue;
     }
 
@@ -322,7 +308,7 @@ function drawConnectors() {
 }
 
 function updateClockOnly() {
-  const parts = getCurrentParts();
+  const parts = getSeoulParts();
   document.getElementById('clock').textContent =
     `${pad2(parts.hour)}:${pad2(parts.minute)}:${pad2(parts.second)}`;
   document.getElementById('date').textContent =
@@ -436,39 +422,10 @@ function setupExcelButton() {
 }
 
 // -------------------------------------------
-// 테스트 패널 상태 (하드웨어 연결 전 화면 확인용 - 배포 시 board/index.html의
-// test-panel 섹션과 이 블록을 함께 제거하면 됩니다)
-// -------------------------------------------
-const testState = { enabled: false, avg: 34.0, timeOverride: null };
-
-function getCurrentParts() {
-  if (testState.timeOverride) {
-    const [h, m] = testState.timeOverride.split(':').map(Number);
-    return { ...getSeoulParts(), hour: h, minute: m, second: 0 };
-  }
-  return getSeoulParts();
-}
-
-function setupTestPanel() {
-  const enabledEl = document.getElementById('test-enabled');
-  const avgEl = document.getElementById('test-avg');
-  const timeEl = document.getElementById('test-time');
-  const applyBtn = document.getElementById('test-apply');
-
-  applyBtn.addEventListener('click', () => {
-    testState.enabled = enabledEl.checked;
-    testState.avg = parseFloat(avgEl.value) || 0;
-    const t = timeEl.value.trim();
-    testState.timeOverride = /^\d{1,2}:\d{2}$/.test(t) ? t : null;
-    tick();
-  });
-}
-
-// -------------------------------------------
 // 메인 루프
 // -------------------------------------------
 async function tick() {
-  const parts = getCurrentParts();
+  const parts = getSeoulParts();
   const nowMinutes = parts.hour * 60 + parts.minute;
   const T = getActiveT(nowMinutes);
 
@@ -492,7 +449,6 @@ async function tick() {
 }
 
 function start() {
-  setupTestPanel();
   setupCriteriaModal();
   setupExcelButton();
   tick();
