@@ -118,6 +118,42 @@ async function fetchWindowData(parts, T) {
   return buildMockReadings(28 + Math.random() * 3);
 }
 
+// 화면에 보여줄 "현재" 값 - 가장 최근에 수집된 공정별 체감온도 (판정용 측정창과 별개, 실시간 표시 전용)
+async function fetchLatestReadings() {
+  if (testState.enabled) {
+    return buildMockReadings(testState.avg);
+  }
+
+  if (supabaseClient) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    try {
+      const { data, error } = await supabaseClient
+        .from('readings')
+        .select('process_name, sense_temp')
+        .order('recorded_at', { ascending: false })
+        .limit(PROCESS_NAMES.length)
+        .abortSignal(controller.signal);
+
+      if (error) throw error;
+      if (data && data.length) {
+        return data.map(r => ({ name: r.process_name, value: r.sense_temp }));
+      }
+    } catch (e) {
+      console.error('최신 데이터 조회 실패, 임시값으로 대체:', e.message);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  return buildMockReadings(28 + Math.random() * 3);
+}
+
+function computeLiveAverage(readings) {
+  const avg = readings.reduce((sum, r) => sum + r.value, 0) / readings.length;
+  return +avg.toFixed(1);
+}
+
 function buildMockReadings(avg) {
   return PROCESS_NAMES.map(name => ({
     name,
@@ -232,13 +268,13 @@ function render(state) {
   document.getElementById('banner-text').textContent =
     state.decision.granted ? '쉬는시간 부여' : '쉬는시간 없음';
 
-  document.getElementById('avg-temp').textContent = `${state.decision.avg}°C`;
+  document.getElementById('avg-temp').textContent = `${state.liveAvg}°C`;
 
   renderDailyStatus(state.dailyStatus);
 
   const grid = document.getElementById('process-grid');
   grid.innerHTML = '';
-  state.readings.forEach(r => {
+  state.liveReadings.forEach(r => {
     const cell = document.createElement('div');
     cell.className = 'process-cell' + (r.value >= THRESHOLD ? ' over' : '');
     cell.innerHTML = `<div class="name">${r.name}</div><div class="value">${r.value}°C</div>`;
@@ -445,8 +481,11 @@ async function tick() {
   const decision = computeDecision(readings);
   const dailyStatus = await computeDailyStatus(parts, nowMinutes);
 
+  const liveReadings = await fetchLatestReadings();
+  const liveAvg = computeLiveAverage(liveReadings);
+
   render({
-    parts, T, readings, decision, dailyStatus,
+    parts, T, readings, decision, dailyStatus, liveReadings, liveAvg,
     windowLabel: `${fmtHM(windowStart.h, windowStart.m)} ~ ${fmtHM(windowEnd.h, windowEnd.m)}`,
     breakLabel: `${fmtHM(breakStart.h, breakStart.m)} ~ ${fmtHM(breakEnd.h, breakEnd.m)}`,
   });
