@@ -309,40 +309,90 @@ function setupCriteriaModal() {
 }
 
 // -------------------------------------------
-// 엑셀 다운로드 (지금까지 쌓인 판정 기록 전체)
+// 엑셀 다운로드 (10분 단위 원시 기록 + 판정 시각에만 부여여부 표시)
 // -------------------------------------------
+
+// Supabase 기본 조회 한도(1000행)를 넘어서도 전체를 가져오기 위한 페이지네이션
+async function fetchAllRows(table, select, orderCol) {
+  const pageSize = 1000;
+  let all = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await supabaseClient
+      .from(table)
+      .select(select)
+      .order(orderCol, { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data || !data.length) break;
+    all = all.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
 async function exportToExcel() {
   if (!supabaseClient) {
     alert('Supabase가 연결되어 있지 않습니다.');
     return;
   }
 
-  const { data, error } = await supabaseClient
-    .from('decisions')
-    .select('log_date, judgment_hour, avg_temp, granted')
-    .order('log_date', { ascending: true })
-    .order('judgment_hour', { ascending: true });
-
-  if (error) {
-    alert('기록을 불러오지 못했습니다: ' + error.message);
+  let readings, decisions;
+  try {
+    [readings, decisions] = await Promise.all([
+      fetchAllRows('readings', 'recorded_at, process_name, sense_temp', 'recorded_at'),
+      fetchAllRows('decisions', 'log_date, judgment_hour, granted', 'log_date'),
+    ]);
+  } catch (e) {
+    alert('기록을 불러오지 못했습니다: ' + e.message);
     return;
   }
-  if (!data || !data.length) {
+
+  if (!readings.length) {
     alert('아직 내보낼 기록이 없습니다.');
     return;
   }
 
-  const rows = data.map(r => ({
-    '날짜': r.log_date,
-    '판정시각': `${pad2(r.judgment_hour)}:00`,
-    '평균 체감온도(℃)': r.avg_temp,
-    '결과': r.granted ? '쉬는시간 부여' : '쉬는시간 없음',
-  }));
+  const decisionMap = new Map();
+  decisions.forEach(d => decisionMap.set(`${d.log_date}_${d.judgment_hour}`, d.granted));
+
+  // 정확히 같은 수집 시각(recorded_at)끼리 한 행으로 묶기
+  const groups = new Map();
+  readings.forEach(r => {
+    if (!groups.has(r.recorded_at)) groups.set(r.recorded_at, {});
+    groups.get(r.recorded_at)[r.process_name] = r.sense_temp;
+  });
+
+  const rows = [...groups.entries()].map(([recordedAt, values]) => {
+    const parts = getSeoulParts(new Date(recordedAt));
+    const dateStr = dateKeyOf(parts);
+
+    const temps = Object.values(values);
+    const avg = temps.length ? +(temps.reduce((s, v) => s + v, 0) / temps.length).toFixed(1) : '';
+
+    // 휴식시간 부여여부는 실제 판정 시각(정각, FIXED_TIMES)에만 표시 - 그 외 10분 단위 행은 비움
+    let breakStatus = '';
+    if (parts.minute === 0 && FIXED_TIMES.includes(parts.hour)) {
+      const key = `${dateStr}_${parts.hour}`;
+      if (decisionMap.has(key)) {
+        breakStatus = decisionMap.get(key) ? '쉬는시간 부여' : '쉬는시간 없음';
+      }
+    }
+
+    const row = { '날짜': dateStr, '시간': fmtHM(parts.hour, parts.minute) };
+    PROCESS_NAMES.forEach(name => {
+      row[`${name}(℃)`] = values[name] != null ? values[name] : '';
+    });
+    row['평균 체감온도(℃)'] = avg;
+    row['쉬는시간 부여여부'] = breakStatus;
+    return row;
+  });
 
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '쉬는시간 기록');
-  XLSX.writeFile(wb, `쉬는시간_기록_${dateKeyOf(getSeoulParts())}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, ws, '체감온도 기록');
+  XLSX.writeFile(wb, `체감온도_기록_${dateKeyOf(getSeoulParts())}.xlsx`);
 }
 
 function setupExcelButton() {
