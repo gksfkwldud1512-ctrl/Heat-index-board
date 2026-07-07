@@ -379,15 +379,35 @@ async function exportToExcel() {
   const decisionMap = new Map();
   decisions.forEach(d => decisionMap.set(`${d.log_date}_${d.judgment_hour}`, d.granted));
 
-  // 정확히 같은 수집 시각(recorded_at)끼리 한 행으로 묶기
-  const groups = new Map();
+  // 실제 데이터를 10분 버킷(KST 기준 0,10,20...분) 단위로 묶기 - 수집 시각이 정확히
+  // 10분 단위가 아니어도(지연 등) 같은 버킷으로 합쳐짐
+  const STEP_MS = 10 * 60 * 1000;
+  const buckets = new Map(); // key: 버킷의 UTC ISO 문자열 -> { 공정명: 값 }
+  let minBucketMs = Infinity;
+  let maxBucketMs = -Infinity;
+
   readings.forEach(r => {
-    if (!groups.has(r.recorded_at)) groups.set(r.recorded_at, {});
-    groups.get(r.recorded_at)[r.process_name] = r.sense_temp;
+    const d = new Date(r.recorded_at);
+    const parts = getSeoulParts(d);
+    const bucketMinute = Math.floor(parts.minute / 10) * 10;
+    const bucketMs = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour - 9, bucketMinute, 0);
+    const key = new Date(bucketMs).toISOString();
+
+    if (!buckets.has(key)) buckets.set(key, {});
+    buckets.get(key)[r.process_name] = r.sense_temp;
+    minBucketMs = Math.min(minBucketMs, bucketMs);
+    maxBucketMs = Math.max(maxBucketMs, bucketMs);
   });
 
-  const rows = [...groups.entries()].map(([recordedAt, values]) => {
-    const parts = getSeoulParts(new Date(recordedAt));
+  // 데이터가 있는 처음 시점부터 지금까지, 10분 구간을 하나도 빠짐없이 생성
+  // (중간에 수집이 끊겼던 구간은 값이 비어있는 행으로 그대로 남아서 누락을 바로 확인 가능)
+  const nowBucketMs = Math.floor(Date.now() / STEP_MS) * STEP_MS;
+  const endMs = Math.max(maxBucketMs, nowBucketMs);
+
+  const rows = [];
+  for (let t = minBucketMs; t <= endMs; t += STEP_MS) {
+    const values = buckets.get(new Date(t).toISOString()) || {};
+    const parts = getSeoulParts(new Date(t));
     const dateStr = dateKeyOf(parts);
 
     const temps = Object.values(values);
@@ -408,8 +428,8 @@ async function exportToExcel() {
     });
     row['평균 체감온도(℃)'] = avg;
     row['쉬는시간 부여여부'] = breakStatus;
-    return row;
-  });
+    rows.push(row);
+  }
 
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
