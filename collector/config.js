@@ -16,11 +16,14 @@ export const CONFIG = {
 
 // 센서 설치 위치 확인 완료 (2026-07-07)
 // board/js/board.js의 PROCESS_NAMES와 이름을 맞춰야 화면에 그대로 매칭됨
+// 2026-07-13: 체감온도계 2대 추가 설치 (1P/2P 정형)
 export const SERIAL_TO_PROCESS = {
   'IST4W2600563': '1P 성형',
   'IST4W2600564': '1P 소결',
+  'IST4W2600558': '1P 정형',
   'IST4W2600557': '1P 후처리',
   'IST4W2600562': '2P 성형',
   'IST4W2600561': '2P 소결',
+  'IST4W2600560': '2P 정형',
   'IST4W2600559': '2P 후처리',
 };
