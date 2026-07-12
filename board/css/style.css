@@ -144,6 +144,14 @@ html, body {
   letter-spacing: 0.05em;
 }
 
+.banner-measured {
+  font-size: 3.6vh;
+  font-weight: 600;
+  margin-top: 1.2vh;
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
 /* 상태별 색상 */
 .screen.state-idle .banner {
   background: #eef1f7;

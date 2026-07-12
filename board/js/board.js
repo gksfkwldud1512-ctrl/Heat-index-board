@@ -36,12 +36,6 @@ const REVEAL_TABLE = FIXED_TIMES
 const pad2 = n => String(n).padStart(2, '0');
 const fmtHM = (h, m) => `${pad2(h)}:${pad2(m)}`;
 
-// 분단위 절대값(음수/1440 이상 포함)을 0~23:59 시:분으로 정규화 (자정 넘는 구간 표시용)
-function minutesToHM(totalMinutes) {
-  const norm = ((totalMinutes % 1440) + 1440) % 1440;
-  return { h: Math.floor(norm / 60), m: norm % 60 };
-}
-
 // -------------------------------------------
 // 시간 계산 (Asia/Seoul 고정, 전광판 PC의 OS 시간대 설정에 의존하지 않음)
 // -------------------------------------------
@@ -71,19 +65,13 @@ function seoulHMToUTCISO(parts, h, m) {
   return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, h - 9, m, 0)).toISOString();
 }
 
-// 현재 시각이 어느 판정 세그먼트에 속하는지, 그 세그먼트가 화면에 표시되는 구간(반영 시작~다음 반영 시작)을
-// 함께 계산 (자정 넘어가는 구간 포함, 순환 처리)
-function getActiveSegment(nowMinutes) {
+// 현재 시각이 어느 판정 세그먼트에 속하는지 계산 (자정 넘어가는 구간 포함, 순환 처리)
+function getActiveT(nowMinutes) {
   for (let i = REVEAL_TABLE.length - 1; i >= 0; i--) {
-    if (nowMinutes >= REVEAL_TABLE[i].revealMinutes) {
-      const next = REVEAL_TABLE[(i + 1) % REVEAL_TABLE.length];
-      const endMinutes = next.revealMinutes + (i === REVEAL_TABLE.length - 1 ? 1440 : 0);
-      return { T: REVEAL_TABLE[i].T, startMinutes: REVEAL_TABLE[i].revealMinutes, endMinutes };
-    }
+    if (nowMinutes >= REVEAL_TABLE[i].revealMinutes) return REVEAL_TABLE[i].T;
   }
   // 첫 세그먼트의 반영 시각보다 이른 새벽 시간대 -> 전날 마지막 세그먼트 결과 유지
-  const last = REVEAL_TABLE[REVEAL_TABLE.length - 1];
-  return { T: last.T, startMinutes: last.revealMinutes - 1440, endMinutes: REVEAL_TABLE[0].revealMinutes };
+  return REVEAL_TABLE[REVEAL_TABLE.length - 1].T;
 }
 
 // -------------------------------------------
@@ -267,6 +255,8 @@ function render(state) {
   document.getElementById('banner-time').textContent = state.breakLabel;
   document.getElementById('banner-text').textContent =
     state.decision.granted ? '쉬는시간 부여' : '쉬는시간 없음';
+  document.getElementById('banner-measured').textContent =
+    `측정시점 온도 ${state.decision.avg}°C`;
 
   document.getElementById('avg-temp').textContent = `${state.liveAvg}°C`;
 
@@ -461,8 +451,7 @@ function setupExcelButton() {
 async function tick() {
   const parts = getSeoulParts();
   const nowMinutes = parts.hour * 60 + parts.minute;
-  const segment = getActiveSegment(nowMinutes);
-  const T = segment.T;
+  const T = getActiveT(nowMinutes);
 
   const readings = await fetchWindowData(parts, T);
   const decision = computeDecision(readings);
@@ -471,12 +460,10 @@ async function tick() {
   const liveReadings = await fetchLatestReadings();
   const liveAvg = computeLiveAverage(liveReadings);
 
-  const start = minutesToHM(segment.startMinutes);
-  const end = minutesToHM(segment.endMinutes);
-
+  // 배너에는 실제 반영/유지 구간이 아니라, 헷갈리지 않도록 해당 판정 시각의 공식 쉬는시간(T~T+10분)을 표시
   render({
     parts, T, readings, decision, dailyStatus, liveReadings, liveAvg,
-    breakLabel: `${fmtHM(start.h, start.m)} ~ ${fmtHM(end.h, end.m)}`,
+    breakLabel: `${fmtHM(T, 0)} ~ ${fmtHM(T, 10)}`,
   });
 }
 

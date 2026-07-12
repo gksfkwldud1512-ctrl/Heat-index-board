@@ -42,11 +42,11 @@
         </div>
         <div class="modal-section">
           <div class="modal-section-title">판정 기준</div>
-          <div class="modal-section-text">측정시간 동안의 평균 체감온도가 <b>33℃ 이상</b>이면 "쉬는시간 부여", 33℃ 미만이면 "쉬는시간 없음"을 표시합니다.</div>
+          <div class="modal-section-text">측정시간 동안의 평균 체감온도가 <b>33℃ 이상</b>이면 판정 시각부터 10분간(T ~ T+10분) "쉬는시간 부여"를 표시합니다. 33℃ 미만이면 "쉬는시간 없음"을 표시합니다. 배너에 함께 표시되는 <b>측정시점 온도</b>가 바로 이 판정에 쓰인 평균값이며, 하단의 "현재 평균 체감온도"(실시간 값)와는 다를 수 있습니다.</div>
         </div>
         <div class="modal-section">
           <div class="modal-section-title">결과 산정이 바뀌는 시점</div>
-          <div class="modal-section-text">화면은 각 측정시간이 끝나는 시점(T-10분, 마지막 데이터가 들어오는 시점)에 판정을 새로 계산해서, 다음 측정시간이 끝날 때까지 그 결과를 계속 표시합니다.</div>
+          <div class="modal-section-text">부여/미부여 판정 자체는 각 측정시간이 끝나는 시점(T-10분, 마지막 데이터가 들어오는 시점)에 새로 계산되어, 다음 측정시간이 끝날 때까지 화면에 유지됩니다. 다만 화면에 표시되는 시간 문구는 헷갈리지 않도록 항상 해당 판정 시각의 공식 쉬는시간(T ~ T+10분)으로 고정 표시됩니다.</div>
           <table class="modal-table">
             <tr><th>화면 표시 구간</th><th>적용되는 판정</th></tr>
             <tr><td>00:50 ~ 02:50</td><td>01:00 판정</td></tr>
@@ -74,6 +74,7 @@
     <div class="banner" id="banner">
       <div class="banner-time" id="banner-time">--:-- ~ --:--</div>
       <div class="banner-text" id="banner-text">판정 대기중</div>
+      <div class="banner-measured" id="banner-measured">측정시점 온도 --°C</div>
     </div>
 
     <div class="diagram-wrap" id="diagram-wrap">
