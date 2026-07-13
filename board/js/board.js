@@ -131,7 +131,9 @@ async function fetchLatestReadings() {
 
       if (error) throw error;
       if (data && data.length) {
-        return data.map(r => ({ name: r.process_name, value: r.sense_temp }));
+        // 화면 표시 순서를 PROCESS_NAMES 순서로 고정 (Supabase는 recorded_at 기준이라 순서 불일치 가능)
+        const byName = new Map(data.map(r => [r.process_name, r.sense_temp]));
+        return PROCESS_NAMES.map(name => ({ name, value: byName.get(name) }));
       }
     } catch (e) {
       console.error('최신 데이터 조회 실패, 임시값으로 대체:', e.message);
@@ -144,7 +146,9 @@ async function fetchLatestReadings() {
 }
 
 function computeLiveAverage(readings) {
-  const avg = readings.reduce((sum, r) => sum + r.value, 0) / readings.length;
+  const valid = readings.filter(r => typeof r.value === 'number');
+  if (!valid.length) return 0;
+  const avg = valid.reduce((sum, r) => sum + r.value, 0) / valid.length;
   return +avg.toFixed(1);
 }
 
@@ -266,8 +270,9 @@ function render(state) {
   grid.innerHTML = '';
   state.liveReadings.forEach(r => {
     const cell = document.createElement('div');
-    cell.className = 'process-cell' + (r.value >= THRESHOLD ? ' over' : '');
-    cell.innerHTML = `<div class="name">${r.name}</div><div class="value">${r.value}°C</div>`;
+    const hasValue = typeof r.value === 'number';
+    cell.className = 'process-cell' + (hasValue && r.value >= THRESHOLD ? ' over' : '');
+    cell.innerHTML = `<div class="name">${r.name}</div><div class="value">${hasValue ? r.value + '°C' : '--°C'}</div>`;
     grid.appendChild(cell);
   });
 

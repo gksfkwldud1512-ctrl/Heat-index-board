@@ -339,3 +339,79 @@ html, body {
   background: #f5f7fb;
   color: #62708c;
 }
+
+/* -------------------------------------------
+   모바일 대응 (같은 페이지를 좁은 화면에서 열 때만 적용 -
+   현장 대형 전광판/데스크톱 레이아웃은 위 규칙 그대로 유지)
+   ------------------------------------------- */
+@media (max-width: 768px) {
+  html, body {
+    height: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .screen {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .topbar {
+    height: auto;
+    flex-wrap: wrap;
+    row-gap: 1vh;
+    padding: 1.5vh 4vw;
+  }
+
+  .logo { height: 4vh; }
+
+  .header-right {
+    gap: 2vw;
+    flex-wrap: wrap;
+  }
+
+  .criteria-btn {
+    padding: 0.8vh 2.5vw;
+    font-size: clamp(11px, 3vw, 14px);
+  }
+
+  .time-area {
+    width: 100%;
+    text-align: left;
+  }
+
+  .date { font-size: clamp(11px, 3vw, 14px); }
+  .clock { font-size: clamp(16px, 5vw, 22px); }
+
+  .banner-time {
+    font-size: clamp(28px, 8vw, 48px);
+  }
+
+  .banner-text {
+    font-size: clamp(36px, 12vw, 64px);
+  }
+
+  .banner-measured {
+    font-size: clamp(14px, 4vw, 20px);
+  }
+
+  .daily-status-strip {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5vw;
+    row-gap: 1vh;
+  }
+
+  .process-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2vw;
+    row-gap: 1.5vh;
+  }
+
+  .info-card {
+    min-width: 70vw;
+  }
+
+  .modal-box {
+    width: 92vw;
+  }
+}
